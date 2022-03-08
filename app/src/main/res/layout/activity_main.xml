@@ -38,4 +38,15 @@
         android:layout_marginBottom="15dp"
         android:text="录制视频"/>
 
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/main_pic"
+        android:layout_width="90dp"
+        android:layout_height="160dp"
+        android:layout_marginTop="15dp"
+        android:layout_marginRight="15dp"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@color/white"
+        android:visibility="gone"/>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
