@@ -192,6 +192,7 @@ class MainActivity : AppCompatActivity() {
                             logE("take photo onCaptureCompleted")
                             savePic()
                             // TODO 恢复预览
+                            _startPreview()
                         }
                     },
                     null
@@ -199,6 +200,92 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    }
+
+    private fun _startPreview() {
+        cDevice?.let { camera->
+
+            ccSession?.let { session->
+                // 设置预览时连续捕获图片数据 ==> 开始预览
+
+                // 构建 CaptureRequest
+                val surface = Surface(binding.mainTv.surfaceTexture)
+                val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                crb.addTarget(surface)
+
+                session.setRepeatingRequest(
+                    crb.build(),
+                    object : CameraCaptureSession.CaptureCallback() {
+
+                        override fun onCaptureStarted(
+                            session: CameraCaptureSession,
+                            request: CaptureRequest,
+                            timestamp: Long,
+                            frameNumber: Long
+                        ) {
+                            super.onCaptureStarted(session, request, timestamp, frameNumber)
+                        }
+
+                        override fun onCaptureCompleted(
+                            session: CameraCaptureSession,
+                            request: CaptureRequest,
+                            result: TotalCaptureResult
+                        ) {
+                            super.onCaptureCompleted(session, request, result)
+                        }
+
+                        override fun onCaptureFailed(
+                            session: CameraCaptureSession,
+                            request: CaptureRequest,
+                            failure: CaptureFailure
+                        ) {
+                            super.onCaptureFailed(session, request, failure)
+                        }
+
+                        override fun onCaptureProgressed(
+                            session: CameraCaptureSession,
+                            request: CaptureRequest,
+                            partialResult: CaptureResult
+                        ) {
+                            super.onCaptureProgressed(session, request, partialResult)
+                        }
+
+                        override fun onCaptureSequenceAborted(
+                            session: CameraCaptureSession,
+                            sequenceId: Int
+                        ) {
+                            super.onCaptureSequenceAborted(session, sequenceId)
+                        }
+
+                        override fun onCaptureSequenceCompleted(
+                            session: CameraCaptureSession,
+                            sequenceId: Int,
+                            frameNumber: Long
+                        ) {
+                            super.onCaptureSequenceCompleted(
+                                session,
+                                sequenceId,
+                                frameNumber
+                            )
+                        }
+
+                        override fun onCaptureBufferLost(
+                            session: CameraCaptureSession,
+                            request: CaptureRequest,
+                            target: Surface,
+                            frameNumber: Long
+                        ) {
+                            super.onCaptureBufferLost(session, request, target, frameNumber)
+                        }
+
+                    },
+                    previewHandler
+                )
+
+                isPreview = true
+            }
+
+        }
     }
 
     private fun startPreview() {
@@ -221,92 +308,7 @@ class MainActivity : AppCompatActivity() {
                         // 保存 session
                         ccSession = session
 
-                        // 构建 CaptureRequest
-                        val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                        crb.addTarget(surface)
-
-                        // 发送请求
-                        // 预览
-                        // 拍照
-
-                        // //设置预览时连续捕获图片数据 ==> 开始预览
-                        session.setRepeatingRequest(
-                            crb.build(),
-                            object : CameraCaptureSession.CaptureCallback() {
-
-                                override fun onCaptureStarted(
-                                    session: CameraCaptureSession,
-                                    request: CaptureRequest,
-                                    timestamp: Long,
-                                    frameNumber: Long
-                                ) {
-                                    super.onCaptureStarted(session, request, timestamp, frameNumber)
-                                    logE(Thread.currentThread().name + " [ onCaptureStarted ]")
-                                }
-
-                                override fun onCaptureCompleted(
-                                    session: CameraCaptureSession,
-                                    request: CaptureRequest,
-                                    result: TotalCaptureResult
-                                ) {
-                                    super.onCaptureCompleted(session, request, result)
-                                    logE(Thread.currentThread().name + " [ onCaptureCompleted ]")
-                                }
-
-                                override fun onCaptureFailed(
-                                    session: CameraCaptureSession,
-                                    request: CaptureRequest,
-                                    failure: CaptureFailure
-                                ) {
-                                    super.onCaptureFailed(session, request, failure)
-                                    logE(Thread.currentThread().name + " [ onCaptureFailed ]")
-                                }
-
-                                override fun onCaptureProgressed(
-                                    session: CameraCaptureSession,
-                                    request: CaptureRequest,
-                                    partialResult: CaptureResult
-                                ) {
-                                    super.onCaptureProgressed(session, request, partialResult)
-                                    logE(Thread.currentThread().name + " [ onCaptureProgressed ]")
-                                }
-
-                                override fun onCaptureSequenceAborted(
-                                    session: CameraCaptureSession,
-                                    sequenceId: Int
-                                ) {
-                                    super.onCaptureSequenceAborted(session, sequenceId)
-                                    logE(Thread.currentThread().name + " [ onCaptureSequenceAborted ]")
-                                }
-
-                                override fun onCaptureSequenceCompleted(
-                                    session: CameraCaptureSession,
-                                    sequenceId: Int,
-                                    frameNumber: Long
-                                ) {
-                                    super.onCaptureSequenceCompleted(
-                                        session,
-                                        sequenceId,
-                                        frameNumber
-                                    )
-                                    logE(Thread.currentThread().name + " [ onCaptureSequenceAborted ]")
-                                }
-
-                                override fun onCaptureBufferLost(
-                                    session: CameraCaptureSession,
-                                    request: CaptureRequest,
-                                    target: Surface,
-                                    frameNumber: Long
-                                ) {
-                                    super.onCaptureBufferLost(session, request, target, frameNumber)
-                                    logE(Thread.currentThread().name + " [ onCaptureBufferLost ]")
-                                }
-
-                            },
-                            previewHandler
-                        )
-
-                        isPreview = true
+                        _startPreview()
 
                     }
 
