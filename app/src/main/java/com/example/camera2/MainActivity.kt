@@ -3,7 +3,6 @@ package com.example.camera2
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
@@ -156,6 +155,7 @@ class MainActivity : AppCompatActivity() {
             val buffer = planes[0].buffer
             val data = ByteArray(buffer.remaining())
             buffer.get(data)
+            image.close()
             val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
             with(binding.mainPic) {
                 visibility = View.VISIBLE
@@ -209,7 +209,6 @@ class MainActivity : AppCompatActivity() {
                 // 设置预览时连续捕获图片数据 ==> 开始预览
 
                 // 构建 CaptureRequest
-                val surface = Surface(binding.mainTv.surfaceTexture)
                 val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                 crb.addTarget(surface)
 
@@ -288,36 +287,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    lateinit var surface:Surface
     private fun startPreview() {
 
         val st = binding.mainTv.surfaceTexture
         st?.let {
 
-            val surface = Surface(st)
+            surface = Surface(st)
             val targets = mutableListOf(surface)
             imageReader?.let {
                 targets.add(it.surface)
             }
 
-            cDevice?.let { camera ->
+            cDevice?.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
 
-                camera.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
+                override fun onConfigured(session: CameraCaptureSession) {
 
-                    override fun onConfigured(session: CameraCaptureSession) {
+                    // 保存 session
+                    ccSession = session
 
-                        // 保存 session
-                        ccSession = session
+                    _startPreview()
 
-                        _startPreview()
+                }
 
-                    }
+                override fun onConfigureFailed(session: CameraCaptureSession) {
 
-                    override fun onConfigureFailed(session: CameraCaptureSession) {
-
-                    }
-                }, cameraHandler)
-
-            }
+                }
+            }, cameraHandler)
 
         }
 
