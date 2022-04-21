@@ -126,7 +126,6 @@ class MainActivity : AppCompatActivity() {
             }, null)
         }
 
-        logE("设备旋转角度 ${display?.rotation}")
 
         cm.cameraIdList.map {
             val cc = cm.getCameraCharacteristics(it)
@@ -167,7 +166,15 @@ class MainActivity : AppCompatActivity() {
             with(binding.mainPic) {
                 visibility = View.VISIBLE
                 // 处理图片旋转问题
-                setImageBitmap(adjustPhotoRotation(bitmap, 90))
+                val sign = -1 // 后置 1是前置
+                val deviceOrientationDegrees = display.rotation
+                val sensorOrientationDegrees = 90 // 后置90 前置270 可以通过
+//                val cc = cm.getCameraCharacteristics(it)
+//                val orientation = cc.get(CameraCharacteristics.SENSOR_ORIENTATION)
+                val rotation = (sensorOrientationDegrees - deviceOrientationDegrees * sign + 360) % 360
+                logE("save $deviceOrientationDegrees - $sensorOrientationDegrees - $rotation")
+                setImageBitmap(rotateBitmapByDegree(bitmap, rotation))
+//                setImageBitmap(bitmap)
             }
 //            bitmap.compress(Bitmap.CompressFormat.JPEG,100,fos)
         }
@@ -175,28 +182,23 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    fun adjustPhotoRotation(bm: Bitmap, orientationDegree: Int): Bitmap? {
-        val m = Matrix()
-        m.setRotate(orientationDegree.toFloat(), bm.width.toFloat() / 2, bm.height.toFloat() / 2)
-        val targetX: Float
-        val targetY: Float
-        if (orientationDegree == 90) {
-            targetX = bm.height.toFloat()
-            targetY = 0f
-        } else {
-            targetX = bm.height.toFloat()
-            targetY = bm.width.toFloat()
+    fun rotateBitmapByDegree(bm: Bitmap, degree: Int): Bitmap? {
+        var returnBm: Bitmap? = null
+        // 根据旋转角度，生成旋转矩阵
+        val matrix = Matrix()
+        matrix.postRotate(degree.toFloat())
+        try {
+            // 将原始图片按照旋转矩阵进行旋转，并得到新的图片
+            returnBm = Bitmap.createBitmap(bm, 0, 0, bm.width, bm.height, matrix, true)
+        } catch (e: OutOfMemoryError) {
         }
-        val values = FloatArray(9)
-        m.getValues(values)
-        val x1 = values[Matrix.MTRANS_X]
-        val y1 = values[Matrix.MTRANS_Y]
-        m.postTranslate(targetX - x1, targetY - y1)
-        val bm1 = Bitmap.createBitmap(bm.height, bm.width, Bitmap.Config.ARGB_8888)
-        val paint = Paint()
-        val canvas = Canvas(bm1)
-        canvas.drawBitmap(bm, m, paint)
-        return bm1
+        if (returnBm == null) {
+            returnBm = bm
+        }
+        if (bm != returnBm) {
+            bm.recycle()
+        }
+        return returnBm
     }
 
     private fun takePhoto() {
