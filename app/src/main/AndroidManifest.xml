@@ -4,9 +4,8 @@
 
     <!-- Permission declarations -->
     <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- A camera with (optional) RAW capability is required to use this application -->
     <uses-feature android:name="android.hardware.camera.any" />
+    <!-- A camera with (optional) RAW capability is required to use this application -->
     <uses-feature android:name="android.hardware.camera.raw" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
 

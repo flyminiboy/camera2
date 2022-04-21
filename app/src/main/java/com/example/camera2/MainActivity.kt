@@ -3,9 +3,7 @@ package com.example.camera2
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
-import android.graphics.SurfaceTexture
+import android.graphics.*
 import android.hardware.camera2.*
 import android.media.ImageReader
 import android.os.Bundle
@@ -128,6 +126,15 @@ class MainActivity : AppCompatActivity() {
             }, null)
         }
 
+        logE("设备旋转角度 ${display?.rotation}")
+
+        cm.cameraIdList.map {
+            val cc = cm.getCameraCharacteristics(it)
+            val orientation = cc.get(CameraCharacteristics.SENSOR_ORIENTATION) // 图像传感器方向
+            logE("相机 ${it} - [${orientation}]")
+        }
+
+
         cm.openCamera("0", object : CameraDevice.StateCallback() {
             override fun onOpened(camera: CameraDevice) { // 摄像头已经打开
                 logE(Thread.currentThread().name + " [ onOpened ]")
@@ -159,11 +166,37 @@ class MainActivity : AppCompatActivity() {
             val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
             with(binding.mainPic) {
                 visibility = View.VISIBLE
-                // TODO 处理图片旋转问题
-                setImageBitmap(bitmap)
+                // 处理图片旋转问题
+                setImageBitmap(adjustPhotoRotation(bitmap, 90))
             }
 //            bitmap.compress(Bitmap.CompressFormat.JPEG,100,fos)
         }
+
+
+    }
+
+    fun adjustPhotoRotation(bm: Bitmap, orientationDegree: Int): Bitmap? {
+        val m = Matrix()
+        m.setRotate(orientationDegree.toFloat(), bm.width.toFloat() / 2, bm.height.toFloat() / 2)
+        val targetX: Float
+        val targetY: Float
+        if (orientationDegree == 90) {
+            targetX = bm.height.toFloat()
+            targetY = 0f
+        } else {
+            targetX = bm.height.toFloat()
+            targetY = bm.width.toFloat()
+        }
+        val values = FloatArray(9)
+        m.getValues(values)
+        val x1 = values[Matrix.MTRANS_X]
+        val y1 = values[Matrix.MTRANS_Y]
+        m.postTranslate(targetX - x1, targetY - y1)
+        val bm1 = Bitmap.createBitmap(bm.height, bm.width, Bitmap.Config.ARGB_8888)
+        val paint = Paint()
+        val canvas = Canvas(bm1)
+        canvas.drawBitmap(bm, m, paint)
+        return bm1
     }
 
     private fun takePhoto() {
@@ -176,6 +209,7 @@ class MainActivity : AppCompatActivity() {
                 imageReader?.let { reader ->
                     tprBuilder.addTarget(reader.surface)
                 }
+
 
                 // 拍照之前停止预览
                 session.stopRepeating();
@@ -199,6 +233,7 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+
 
     }
 
