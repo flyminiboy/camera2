@@ -454,6 +454,7 @@ class MainActivity : AppCompatActivity() {
 
 
         codec?.apply {
+            // TODO bugfix stop 之后 mediacodec状态进入到 Uninitialized 需要再次进行config，才可以再次start
             stop()
             release()
 
