@@ -296,73 +296,9 @@ class MainActivity : AppCompatActivity() {
                 val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                 crb.addTarget(surface)
 
-                // TODO fix
                 session.setRepeatingRequest(
                     crb.build(),
-                    object : CameraCaptureSession.CaptureCallback() {
-
-                        override fun onCaptureStarted(
-                            session: CameraCaptureSession,
-                            request: CaptureRequest,
-                            timestamp: Long,
-                            frameNumber: Long
-                        ) {
-                            super.onCaptureStarted(session, request, timestamp, frameNumber)
-                        }
-
-                        override fun onCaptureCompleted(
-                            session: CameraCaptureSession,
-                            request: CaptureRequest,
-                            result: TotalCaptureResult
-                        ) {
-                            super.onCaptureCompleted(session, request, result)
-                        }
-
-                        override fun onCaptureFailed(
-                            session: CameraCaptureSession,
-                            request: CaptureRequest,
-                            failure: CaptureFailure
-                        ) {
-                            super.onCaptureFailed(session, request, failure)
-                        }
-
-                        override fun onCaptureProgressed(
-                            session: CameraCaptureSession,
-                            request: CaptureRequest,
-                            partialResult: CaptureResult
-                        ) {
-                            super.onCaptureProgressed(session, request, partialResult)
-                        }
-
-                        override fun onCaptureSequenceAborted(
-                            session: CameraCaptureSession,
-                            sequenceId: Int
-                        ) {
-                            super.onCaptureSequenceAborted(session, sequenceId)
-                        }
-
-                        override fun onCaptureSequenceCompleted(
-                            session: CameraCaptureSession,
-                            sequenceId: Int,
-                            frameNumber: Long
-                        ) {
-                            super.onCaptureSequenceCompleted(
-                                session,
-                                sequenceId,
-                                frameNumber
-                            )
-                        }
-
-                        override fun onCaptureBufferLost(
-                            session: CameraCaptureSession,
-                            request: CaptureRequest,
-                            target: Surface,
-                            frameNumber: Long
-                        ) {
-                            super.onCaptureBufferLost(session, request, target, frameNumber)
-                        }
-
-                    },
+                    null,
                     previewHandler
                 )
 
@@ -383,6 +319,7 @@ class MainActivity : AppCompatActivity() {
             imageReader?.apply { // 拍照
                 targets.add(surface)
             }
+            targets.add(codecSurface)
 
             cDevice?.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
 
@@ -397,6 +334,11 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onConfigureFailed(session: CameraCaptureSession) {
 
+                }
+
+                override fun onClosed(session: CameraCaptureSession) {
+                    super.onClosed(session)
+                    logE("what fuck")
                 }
             }, cameraHandler)
 
@@ -426,8 +368,8 @@ class MainActivity : AppCompatActivity() {
         codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
 
         // MediaFormat 使用”key-value”键值对的形式存储多媒体数据格式信息 视频数据
-        val mediaFormat = MediaFormat.createVideoFormat(
-            MediaFormat.MIMETYPE_VIDEO_AVC, 1920, 1080
+        val mediaFormat = MediaFormat.createVideoFormat( // 很重要，尤其是宽高要选择设备支持
+            MediaFormat.MIMETYPE_VIDEO_AVC, 1440, 1080
         ).apply {
             setInteger( // 这个地方很重要，一定要配置对，使用 input buffer的方式 和 使用 input surface 不一样
                 MediaFormat.KEY_COLOR_FORMAT,
@@ -459,7 +401,7 @@ class MainActivity : AppCompatActivity() {
 
             codecSurface = createInputSurface()
 
-            logE("完成编码器配置")
+            logE("完成编码器配置[${codecSurface.isValid}]")
 
             //初始化 MediaMuxer（混合器） 将H264文件打包成MP4
             val file = File(filesDir, UUID.randomUUID().toString() + ".mp4")
@@ -477,15 +419,39 @@ class MainActivity : AppCompatActivity() {
         if (isRecord) {
             return
         }
-        isRecord = true
 
-        codec?.start()
+        cDevice?.let { camera ->
+
+            ccSession?.let { session ->
+                // 设置预览时连续捕获图片数据 ==> 开始预览
+
+                session.stopRepeating()
+                session.abortCaptures()
+
+                // 构建 CaptureRequest
+                val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
+                crb.addTarget(surface)
+                crb.addTarget(codecSurface)
+
+                session.setRepeatingRequest(
+                    crb.build(),
+                    null,
+                    null
+                )
+
+                isRecord = true
+                codec?.start()
+            }
+
+        }
+
     }
 
     private fun stopRecord() {
         if (!isRecord) {
             return
         }
+
 
         codec?.apply {
             stop()
@@ -496,68 +462,20 @@ class MainActivity : AppCompatActivity() {
                 release()
             }
 
+            ccSession?.let { session->
+                session.stopRepeating()
+                session.abortCaptures()
+                _startPreview()
+            }
+
             isRecord = false
 
-            toast("video save [ $path ]")
+
+
+            logE("video save [ $path ]")
         }
 
     }
-
-//    private fun encode() {
-//        logE("encode")
-//        encoderHandler.post {
-//            codec?.apply {
-//
-//                while (true) {
-//                    val bufferInfo = MediaCodec.BufferInfo()
-//                    var outputBufferId: Int = dequeueOutputBuffer(bufferInfo, 0)
-//                    // 稍后重试
-//                    if (outputBufferId == MediaCodec.INFO_TRY_AGAIN_LATER) {
-//                        logE("INFO_TRY_AGAIN_LATER what fuck")
-//                        break
-//                    }
-//                    //输出格式发生变化 第一次总会调用，所以在这个地方开启混合器
-//                    if (outputBufferId == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-//                        // 添加视频轨道
-//                        mediaMuxer?.let { mm ->
-//                            val nmf = outputFormat
-//                            videoTrack = mm.addTrack(nmf)
-//                            mm.start() // 开始工作
-//                            logE("mediaMuxer 开始工作")
-//                        }
-//                        continue
-//                    }
-//                    if (outputBufferId == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
-//                        continue
-//                    }
-//
-//                    // 获取有效数据
-//                    getOutputBuffer(outputBufferId)?.apply {
-//                        // 当前的buffer是配置信息
-//                        if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-//                            bufferInfo.size = 0
-//                        }
-//                        if (bufferInfo.size != 0) {
-//
-//                            mediaMuxer?.let { mm ->
-//                                // 设置数据开始偏移量
-//                                position(bufferInfo.offset)
-//                                // 设置数据长度
-//                                limit(bufferInfo.offset + bufferInfo.size)
-//                                // 混合器写到MP4文件中
-//                                mm.writeSampleData(videoTrack, this, bufferInfo)
-//                                // 释放输出数据缓冲区
-//                                releaseOutputBuffer(outputBufferId, false)
-//
-//                                logE("mediaMuxer 写入数据")
-//                            }
-//                        }
-//                    } ?: continue
-//
-//                }
-//            }
-//        }
-//    }
 
     inner class EncodecCallback : MediaCodec.Callback() {
         override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
@@ -570,6 +488,29 @@ class MainActivity : AppCompatActivity() {
             info: MediaCodec.BufferInfo
         ) {
             logE("onOutputBufferAvailable")
+            if (!isRecord) {
+                // 释放输出数据缓冲区
+                codec.releaseOutputBuffer(index, false)
+                return
+            }
+            // 获取有效数据
+            codec.getOutputBuffer(index)?.apply {
+                if (info.size > 0) {
+
+                    mediaMuxer?.let { mm ->
+                        // 设置数据开始偏移量
+                        position(info.offset)
+                        // 设置数据长度
+                        limit(info.offset + info.size)
+                        // 混合器写到MP4文件中
+                        mm.writeSampleData(videoTrack, this, info)
+                        // 释放输出数据缓冲区
+                        codec.releaseOutputBuffer(index, false)
+
+                        logE("mediaMuxer 写入数据")
+                    }
+                }
+            }
         }
 
         override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
@@ -578,6 +519,13 @@ class MainActivity : AppCompatActivity() {
 
         override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
             logE("onOutputFormatChanged")
+            // 添加视频轨道
+            mediaMuxer?.let { mm ->
+                val nmf = codec.outputFormat
+                videoTrack = mm.addTrack(nmf)
+                mm.start() // 开始工作
+                logE("mediaMuxer 开始工作")
+            }
         }
 
     }
