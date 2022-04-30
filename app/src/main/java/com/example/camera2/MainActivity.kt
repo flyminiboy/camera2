@@ -274,7 +274,7 @@ class MainActivity : AppCompatActivity() {
                             super.onCaptureCompleted(session, request, result)
                             logE("take photo onCaptureCompleted")
                             savePic()
-                            // TODO 恢复预览
+
                             _startPreview()
                         }
                     },
@@ -317,9 +317,12 @@ class MainActivity : AppCompatActivity() {
             surface = Surface(st) // 预览
             val targets = mutableListOf(surface)
             imageReader?.apply { // 拍照
-                targets.add(surface)
+                targets.add(this.surface)
             }
-            targets.add(codecSurface)
+            codecSurface?.apply {
+                targets.add(this)
+            }
+
 
             cDevice?.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
 
@@ -347,7 +350,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    lateinit var codecSurface: Surface
+    var codecSurface: Surface?=null
 
     private fun configEncoder() { // 配置编码器
 
@@ -367,9 +370,13 @@ class MainActivity : AppCompatActivity() {
 //        ● “audio/g711-mlaw” - G.711 ulaw audio
         codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
 
+
+
         // MediaFormat 使用”key-value”键值对的形式存储多媒体数据格式信息 视频数据
+
+
         val mediaFormat = MediaFormat.createVideoFormat( // 很重要，尤其是宽高要选择设备支持
-            MediaFormat.MIMETYPE_VIDEO_AVC, 1440, 1080
+            MediaFormat.MIMETYPE_VIDEO_AVC, 960, 720
         ).apply {
             setInteger( // 这个地方很重要，一定要配置对，使用 input buffer的方式 和 使用 input surface 不一样
                 MediaFormat.KEY_COLOR_FORMAT,
@@ -399,9 +406,12 @@ class MainActivity : AppCompatActivity() {
             ) // 配置以后才可以创建Surface
             // 配置之后，启动之前，创建surface
 
-            codecSurface = createInputSurface()
+            mCodecStatus = 1
 
-            logE("完成编码器配置[${codecSurface.isValid}]")
+            if (codecSurface == null)
+                codecSurface = createInputSurface()
+
+            logE("完成编码器配置[${codecSurface?.isValid}]")
 
             //初始化 MediaMuxer（混合器） 将H264文件打包成MP4
             val file = File(filesDir, UUID.randomUUID().toString() + ".mp4")
@@ -415,11 +425,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startRecord() {
-        if (isRecord) {
-            return
-        }
+    /**
+     * 手动记录编码器的状态 默认  Uninitialized -> 0
+     *  reset
+     *  stop
+     * Uninitialized -> 0
+     *  configure
+     * Configured -> 1
+     *  start
+     * Executing -> 2
+     *
+     * Error -> -1
+     *
+     *  release
+     * Released -> 3
+     *
+     */
+    private var mCodecStatus: Int = 0
 
+    private fun _startRecord() {
         cDevice?.let { camera ->
 
             ccSession?.let { session ->
@@ -431,7 +455,10 @@ class MainActivity : AppCompatActivity() {
                 // 构建 CaptureRequest
                 val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
                 crb.addTarget(surface)
-                crb.addTarget(codecSurface)
+                codecSurface?.apply {
+                    crb.addTarget(this)
+                }
+
 
                 session.setRepeatingRequest(
                     crb.build(),
@@ -441,8 +468,35 @@ class MainActivity : AppCompatActivity() {
 
                 isRecord = true
                 codec?.start()
+
+                mCodecStatus = 2
             }
 
+        }
+    }
+
+    private fun startRecord() {
+        if (isRecord) {
+            return
+        }
+
+        // 判断编码器状态 如果已经是stop/release/reset 则再次进行config操作
+        when (mCodecStatus) {
+            1 -> {
+                _startRecord()
+            }
+            0-> {
+                configEncoder()
+
+                ccSession?.apply {
+                    close()
+                }
+
+                startPreview()
+
+                // 重新开启录制
+                _startRecord()
+            }
         }
 
     }
@@ -456,22 +510,19 @@ class MainActivity : AppCompatActivity() {
         codec?.apply {
             // TODO bugfix stop 之后 mediacodec状态进入到 Uninitialized 需要再次进行config，才可以再次start
             stop()
-            release()
+            mCodecStatus = 0
 
             mediaMuxer?.apply { // 这个段代码不写，视频黑屏无法播放，报错 moov atom not found
                 stop()
-                release()
             }
 
-            ccSession?.let { session->
+            ccSession?.let { session ->
                 session.stopRepeating()
                 session.abortCaptures()
                 _startPreview()
             }
 
             isRecord = false
-
-
 
             logE("video save [ $path ]")
         }
@@ -489,7 +540,7 @@ class MainActivity : AppCompatActivity() {
             info: MediaCodec.BufferInfo
         ) {
             logE("onOutputBufferAvailable")
-            if (!isRecord) {
+            if (!isRecord) { // 一定释放，否则会出现 camera request not completed
                 // 释放输出数据缓冲区
                 codec.releaseOutputBuffer(index, false)
                 return
@@ -522,13 +573,17 @@ class MainActivity : AppCompatActivity() {
             logE("onOutputFormatChanged")
             // 添加视频轨道
             mediaMuxer?.let { mm ->
-                val nmf = codec.outputFormat
-                videoTrack = mm.addTrack(nmf)
+                videoTrack = mm.addTrack(format)
                 mm.start() // 开始工作
                 logE("mediaMuxer 开始工作")
             }
         }
 
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // TODO 做资源释放操作
     }
 
 }
