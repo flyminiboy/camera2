@@ -5,18 +5,20 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.camera2.*
-import android.hardware.camera2.params.SessionConfiguration
 import android.media.*
+import android.media.MediaCodec.createPersistentInputSurface
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Size
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.example.camera2.databinding.ActivityMainBinding
 import java.io.File
-import java.nio.ByteBuffer
 import java.util.*
 
 
@@ -50,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     private var mediaMuxer: MediaMuxer? = null
     private var videoTrack: Int = 0
     private var path: String? = null
+    private var startMux = false
 
     private val encoderThread = HandlerThread("encode")
     private val encoderHandler by lazy {
@@ -57,12 +60,11 @@ class MainActivity : AppCompatActivity() {
         Handler(encoderThread.looper)
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).apply {
             setContentView(this.root)
-
-            configEncoder()
 
             this.mainTakePhoto.setOnClickListener {
                 if (!isPreview) {
@@ -118,29 +120,6 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    // MediaCodecList 获取所有可用的编解码器
-    private fun selectCodec(mimeType: String): MediaCodecInfo? {
-        // 获取所有支持编解码器数量
-        val numCodecs = MediaCodecList.getCodecCount() // getCodecInfos
-
-        for (i in 0 until numCodecs) {
-            // 编解码器相关性信息存储在MediaCodecInfo中
-            val codecInfo = MediaCodecList.getCodecInfoAt(i)
-            // 判断是否为编码器
-            if (!codecInfo.isEncoder) {
-                continue
-            }
-            // 获取编码器支持的MIME类型，并进行匹配
-            val types = codecInfo.supportedTypes
-            for (j in types.indices) {
-                if (types[j].equals(mimeType, ignoreCase = true)) {
-                    return codecInfo
-                }
-            }
-        }
-        return null
-    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -173,14 +152,8 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        cm.cameraIdList.map {
-            val cc = cm.getCameraCharacteristics(it)
-            val orientation = cc.get(CameraCharacteristics.SENSOR_ORIENTATION) // 图像传感器方向
-            logE("相机 ${it} - [${orientation}]")
-        }
-
-
         cm.openCamera("0", object : CameraDevice.StateCallback() {
+            @RequiresApi(Build.VERSION_CODES.M)
             override fun onOpened(camera: CameraDevice) { // 摄像头已经打开
                 logE(Thread.currentThread().name + " [ onOpened ]")
                 cDevice = camera
@@ -295,6 +268,11 @@ class MainActivity : AppCompatActivity() {
                 // 构建 CaptureRequest
                 val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                 crb.addTarget(surface)
+                if (startToRecord) {
+                    codecSurface?.apply {
+                        crb.addTarget(this)
+                    }
+                }
 
                 session.setRepeatingRequest(
                     crb.build(),
@@ -303,12 +281,18 @@ class MainActivity : AppCompatActivity() {
                 )
 
                 isPreview = true
+
+                if (startToRecord) {
+                    _startRecord()
+                    startToRecord = false
+                }
             }
 
         }
     }
 
     lateinit var surface: Surface
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun startPreview() {
 
         val st = binding.mainTv.surfaceTexture
@@ -319,10 +303,27 @@ class MainActivity : AppCompatActivity() {
             imageReader?.apply { // 拍照
                 targets.add(this.surface)
             }
+            // 创建持久surface
+            codecSurface = createPersistentInputSurface()
             codecSurface?.apply {
+                logE("PersistentInputSurface ${isValid}")
                 targets.add(this)
             }
 
+            configEncoder()
+
+            cm.cameraIdList.map {
+                val cc = cm.getCameraCharacteristics(it)
+                val orientation = cc.get(CameraCharacteristics.SENSOR_ORIENTATION) // 图像传感器方向
+                logE("相机 ${it} - [${orientation}]")
+                val streamConfigurationMap = cc.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                val size = streamConfigurationMap?.run {
+                    getOutputSizes(SurfaceTexture::class.java)[0]
+                }?.apply {
+                    st.setDefaultBufferSize(width, height)
+                }
+
+            }
 
             cDevice?.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
 
@@ -350,8 +351,26 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    var codecSurface: Surface?=null
+    var codecSurface: Surface? = null
 
+    // MediaCodecList 获取所有可用的编解码器
+    fun selectCodec(mimeType: String): List<MediaCodecInfo> {
+        val mediaCodecInfos = mutableListOf<MediaCodecInfo>()
+        MediaCodecList(MediaCodecList.ALL_CODECS).run {
+             codecInfos.map { mediaCodecInfo->
+                if (mediaCodecInfo.isEncoder) {
+                    mediaCodecInfo.supportedTypes.map { type->
+                        if (type.equals(mimeType)) {
+                            mediaCodecInfos.add(mediaCodecInfo)
+                        }
+                    }
+                }
+            }
+        }
+        return mediaCodecInfos
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun configEncoder() { // 配置编码器
 
 
@@ -370,12 +389,20 @@ class MainActivity : AppCompatActivity() {
 //        ● “audio/g711-mlaw” - G.711 ulaw audio
         codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
 
-
+        selectCodec(MediaFormat.MIMETYPE_VIDEO_AVC).map {
+            logE("${it.name}")
+            val capabilities = it.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            val vcap = capabilities.videoCapabilities
+            logE("[${vcap.bitrateRange}]")
+            logE("[${vcap.supportedWidths.lower} - ${vcap.supportedWidths.upper}]")
+            logE("[${vcap.supportedHeights.lower} - ${vcap.supportedHeights.upper}]")
+            logE("==============================================")
+        }
 
         // MediaFormat 使用”key-value”键值对的形式存储多媒体数据格式信息 视频数据
 
 
-        val mediaFormat = MediaFormat.createVideoFormat( // 很重要，尤其是宽高要选择设备支持
+        val mediaFormat = MediaFormat.createVideoFormat( //TODO  很重要，尤其是宽高要选择设备支持
             MediaFormat.MIMETYPE_VIDEO_AVC, 960, 720
         ).apply {
             setInteger( // 这个地方很重要，一定要配置对，使用 input buffer的方式 和 使用 input surface 不一样
@@ -386,6 +413,13 @@ class MainActivity : AppCompatActivity() {
 //            NV12(YUV420sp) ———> COLOR_FormatYUV420PackedSemiPlanar
 //            NV21 ———-> COLOR_FormatYUV420SemiPlanar
 //            YV12(I420) ———-> COLOR_FormatYUV420Planar
+            // w * h * fps * factory
+            // 关于 factory
+//            通常情况下，在网络流媒体使用场景中，可以将Factor设置为0.1~0.2，这样能在保证画面损失不严重的情况下生成出来的视频文件大小较小；
+//            在普通本地浏览的使用场景中，可以将Factor设置为0.25~0.5，这样可以保证画面清晰度不会因为编码而造成过多肉眼可见的损失，这样生成出来的视频文件也相对较大；
+//            在高清视频处理的使用场景中，可以将Factor设置为0.5以上
+            // 不同设备的不同编码器会有一个支持的范围，不要超过最大值，否则可能引发crash configexception
+
             setInteger(MediaFormat.KEY_BIT_RATE, 500_000) // 比特率
             setInteger(MediaFormat.KEY_FRAME_RATE, 30) // 帧率
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2) // I帧间隔
@@ -408,8 +442,27 @@ class MainActivity : AppCompatActivity() {
 
             mCodecStatus = 1
 
-            if (codecSurface == null)
-                codecSurface = createInputSurface()
+
+//            static class PersistentSurface extends Surface {
+//            @SuppressWarnings("unused")
+//            PersistentSurface() {} // used by native
+//
+//            @Override
+//            public void release() {
+//                native_releasePersistentInputSurface(this);
+//                super.release();
+//            }
+//
+//            private long mPersistentObject;
+//        };
+
+            codecSurface?.apply {
+                logE("设置输入surface")
+                setInputSurface(this) // API23 开始支持 使用已经创建好的持久性输入表面
+            }
+
+//createInputSurface()
+//            codecSurface = createInputSurface()
 
             logE("完成编码器配置[${codecSurface?.isValid}]")
 
@@ -455,6 +508,7 @@ class MainActivity : AppCompatActivity() {
                 // 构建 CaptureRequest
                 val crb = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
                 crb.addTarget(surface)
+
                 codecSurface?.apply {
                     crb.addTarget(this)
                 }
@@ -468,6 +522,7 @@ class MainActivity : AppCompatActivity() {
 
                 isRecord = true
                 codec?.start()
+                logE("开始录制")
 
                 mCodecStatus = 2
             }
@@ -475,6 +530,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    var startToRecord = false
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun startRecord() {
         if (isRecord) {
             return
@@ -483,19 +540,23 @@ class MainActivity : AppCompatActivity() {
         // 判断编码器状态 如果已经是stop/release/reset 则再次进行config操作
         when (mCodecStatus) {
             1 -> {
-                _startRecord()
+                ccSession?.apply {
+                    stopRepeating()
+                    abortCaptures()
+                }
+                startToRecord = true
+                _startPreview()
             }
-            0-> {
+            -1, 0 -> {
                 configEncoder()
 
                 ccSession?.apply {
-                    close()
+                    stopRepeating()
+                    abortCaptures()
                 }
+                startToRecord = true
+                _startPreview()
 
-                startPreview()
-
-                // 重新开启录制
-                _startRecord()
             }
         }
 
@@ -508,12 +569,17 @@ class MainActivity : AppCompatActivity() {
 
 
         codec?.apply {
-            // TODO bugfix stop 之后 mediacodec状态进入到 Uninitialized 需要再次进行config，才可以再次start
+            signalEndOfInputStream() // 告知编码器我们要结束编码
+            // mediacodec状态进入到 Uninitialized 需要再次进行config，才可以再次start
             stop()
             mCodecStatus = 0
 
             mediaMuxer?.apply { // 这个段代码不写，视频黑屏无法播放，报错 moov atom not found
-                stop()
+                // 加一个状态判断
+                if (startMux) {
+                    stop()
+                    startMux = false
+                }
             }
 
             ccSession?.let { session ->
@@ -531,7 +597,8 @@ class MainActivity : AppCompatActivity() {
 
     inner class EncodecCallback : MediaCodec.Callback() {
         override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
-            logE("onInputBufferAvailable")
+            // TODO surface
+            // TODO buffer
         }
 
         override fun onOutputBufferAvailable(
@@ -539,7 +606,9 @@ class MainActivity : AppCompatActivity() {
             index: Int,
             info: MediaCodec.BufferInfo
         ) {
+
             logE("onOutputBufferAvailable")
+            // Timed out while waiting for request to complete.
             if (!isRecord) { // 一定释放，否则会出现 camera request not completed
                 // 释放输出数据缓冲区
                 codec.releaseOutputBuffer(index, false)
@@ -558,23 +627,29 @@ class MainActivity : AppCompatActivity() {
                         mm.writeSampleData(videoTrack, this, info)
                         // 释放输出数据缓冲区
                         codec.releaseOutputBuffer(index, false)
-
-                        logE("mediaMuxer 写入数据")
                     }
                 }
             }
         }
 
         override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
-            logE("onError")
+            // TODO  重置编码器
+            codec.reset()
+            if (startMux) {
+                mediaMuxer?.apply {
+                    this.stop()
+                }
+            }
+            mCodecStatus = -1
         }
 
         override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
-            logE("onOutputFormatChanged")
             // 添加视频轨道
+            logE("onOutputFormatChanged")
             mediaMuxer?.let { mm ->
                 videoTrack = mm.addTrack(format)
                 mm.start() // 开始工作
+                startMux = true
                 logE("mediaMuxer 开始工作")
             }
         }
