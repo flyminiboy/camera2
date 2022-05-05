@@ -4,6 +4,6 @@ import android.util.Log
 
 const val TAG = "fuck"
 
-fun Any.logE(msg:String) {
+fun logE(msg:String) {
     Log.e(TAG, msg)
 }

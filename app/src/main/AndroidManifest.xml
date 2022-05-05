@@ -6,7 +6,9 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" />
     <!-- A camera with (optional) RAW capability is required to use this application -->
-    <uses-feature android:name="android.hardware.camera.raw" android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.raw"
+        android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
 
     <application
@@ -17,6 +19,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Camera2">
         <activity
+            android:name=".CameraActivity"
+            android:exported="false" />
+        <activity
+            android:name=".RecordActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
@@ -25,6 +33,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>
