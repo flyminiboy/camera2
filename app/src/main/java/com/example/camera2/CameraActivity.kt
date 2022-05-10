@@ -3,21 +3,27 @@ package com.example.camera2
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
+import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.view.Surface
+import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import com.example.camera2.databinding.ActivityCameraBinding
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
+var context: Context? = null
+
 class CameraActivity : AppCompatActivity() {
+
 
     private lateinit var mBinding: ActivityCameraBinding
 
@@ -25,10 +31,12 @@ class CameraActivity : AppCompatActivity() {
         applicationContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     }
     private var mCameraDevice: CameraDevice? = null
-    private var mCameraCaptureSession:CameraCaptureSession?=null
-    private var mSurface: Surface?=null
+    private var mCameraCaptureSession: CameraCaptureSession? = null
+    private var mSurface: Surface? = null
+    private var mSurfaceTexture: SurfaceTexture? = null
 
-    private lateinit var cameraPreview:Camera2SurfaceView
+    private lateinit var cameraPreview: GLSurfaceView
+    val drawer = VideoDrawer()
 
     private val mCameraThread = HandlerThread("camera")
     private val mCameraHandler by lazy {
@@ -37,21 +45,45 @@ class CameraActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        this.requestWindowFeature(Window.FEATURE_NO_TITLE)
         super.onCreate(savedInstanceState)
-
+        context = this
         mBinding = ActivityCameraBinding.inflate(layoutInflater).apply {
 
-            cameraPreview = Camera2SurfaceView(this@CameraActivity)
-            root.addView(cameraPreview)
-            setContentView(root)
+//            cameraPreview = Camera2SurfaceView(this@CameraActivity)
+//            root.addView(cameraPreview)
+//            setContentView(root)
+//
+//            (cameraPreview as Camera2SurfaceView).setSurfaceTextureAvailableLisener {
+//                mSurfaceTexture = it
+//                if (hasCameraPermission()) {
+//                    openCamera()
+//                } else {
+//                    requestCameraPermission()
+//                }
+//            }
 
-            cameraPreview.setSurfaceTextureAvailableLisener {
+
+            drawer.setSurfaceTextureAvailableLisener {
+                logE("SurfaceTextureAvailable")
+                mSurfaceTexture = it
+                it.setOnFrameAvailableListener {
+                    cameraPreview.requestRender()
+                }
                 if (hasCameraPermission()) {
                     openCamera()
                 } else {
                     requestCameraPermission()
                 }
             }
+
+            cameraPreview = GLSurfaceView(this@CameraActivity)
+            cameraPreview.setEGLContextClientVersion(3)
+            cameraPreview.setRenderer(PlayRender(drawer))
+            cameraPreview.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+            root.addView(cameraPreview)
+            setContentView(root)
+
         }
     }
 
@@ -93,13 +125,13 @@ class CameraActivity : AppCompatActivity() {
 
     private fun createSession() {
         // 预览
-        val targets = Surface(cameraPreview.mSurfaceTexture).run {
+        val targets = Surface(mSurfaceTexture).run {
             mSurface = this
             mutableListOf(this)
         }
 
         mCameraDevice?.apply {
-            createCaptureSession(targets, object :CameraCaptureSession.StateCallback(){
+            createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(session: CameraCaptureSession) {
                     mCameraCaptureSession = session
                     startPreivew()

@@ -6,6 +6,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.lang.Exception
+import java.lang.RuntimeException
 
 fun loadShaderSource(context: Context, rawId: Int) =
     with(context) {
@@ -41,14 +42,12 @@ fun loadShader(shaderType: Int, shaderSource: String) =
         GLES30.glGetShaderiv(shader, GLES30.GL_COMPILE_STATUS, compiled, 0)
         if (compiled[0] == GLES30.GL_FALSE) {
             val error = GLES30.glGetShaderInfoLog(shader)
-            logE("glCompileShader info [ $error ]")
-            GLES30.glDeleteShader(shader)
-            return GLES30.GL_FALSE
+            throw RuntimeException("glCompileShader failed [${shaderType}] \n ${shaderSource}\n error message [${error}]")
         }
     }
 
 
-fun createAndLinkProgrm(context: Context, vertexShader: Int, fragmentShader: Int) =
+fun createAndLinkProgrm(vertexShader: Int, fragmentShader: Int) =
     // 构建着色器程序对象
     GLES30.glCreateProgram().also { program ->
 
@@ -64,8 +63,7 @@ fun createAndLinkProgrm(context: Context, vertexShader: Int, fragmentShader: Int
         GLES30.glGetProgramiv(program, GLES30.GL_LINK_STATUS, linked, 0)
         if (linked[0] == GLES30.GL_FALSE) {
             val error = GLES30.glGetProgramInfoLog(program)
-            logE("glCompileShader info [ $error ]")
-            return GLES30.GL_FALSE
+            throw RuntimeException("glLinkProgram failed, error message [${error}]")
         }
 
         // 在把着色器对象链接到程序对象以后，记得删除着色器对象，我们不再需要它们了

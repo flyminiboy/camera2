@@ -74,7 +74,7 @@ class Camera2SurfaceView(context: Context) : GLSurfaceView(context) {
                 loadShader(GLES30.GL_FRAGMENT_SHADER, this)
             }
 
-            program = createAndLinkProgrm(context, vertexShader, fragmentShader)
+            program = createAndLinkProgrm(vertexShader, fragmentShader)
 
 
             // 创建并绑定纹理

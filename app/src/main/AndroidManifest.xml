@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.camera2">
-
     <!-- Permission declarations -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera.any" />
-    <!-- A camera with (optional) RAW capability is required to use this application -->
+
+    <uses-feature android:name="android.hardware.camera.any" /> <!-- A camera with (optional) RAW capability is required to use this application -->
     <uses-feature
         android:name="android.hardware.camera.raw"
         android:required="false" />
@@ -19,7 +18,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Camera2">
         <activity
+            android:name=".WaterMarkActivity"
+            android:exported="false" />
+        <activity
             android:name=".CameraActivity"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="false" />
         <activity
             android:name=".RecordActivity"
@@ -33,7 +36,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
     </application>
 
 </manifest>
