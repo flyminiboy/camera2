@@ -1,29 +1,13 @@
 package com.example.camera2
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.*
-import android.hardware.camera2.*
-import android.media.*
-import android.media.MediaCodec.createPersistentInputSurface
 import android.opengl.EGL14
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.HandlerThread
-import android.util.Size
-import android.view.Surface
-import android.view.TextureView
-import android.view.View
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.example.camera2.databinding.ActivityMainBinding
-import java.io.File
-import java.util.*
 import javax.microedition.khronos.egl.EGL10
-import javax.microedition.khronos.egl.EGL11
 
 
 class MainActivity : AppCompatActivity() {
@@ -46,7 +30,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             mainWaterMark.setOnClickListener {
-                startActivity(Intent(this@MainActivity, WaterMarkActivity::class.java))
+                startActivity(Intent(this@MainActivity, PlayActivity::class.java))
             }
 
             mainTestegl.setOnClickListener {

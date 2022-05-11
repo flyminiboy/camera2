@@ -36,7 +36,7 @@ class CameraActivity : AppCompatActivity() {
     private var mSurfaceTexture: SurfaceTexture? = null
 
     private lateinit var cameraPreview: GLSurfaceView
-    val drawer = VideoDrawer()
+    val playRender = PlayRender()
 
     private val mCameraThread = HandlerThread("camera")
     private val mCameraHandler by lazy {
@@ -64,8 +64,7 @@ class CameraActivity : AppCompatActivity() {
 //            }
 
 
-            drawer.setSurfaceTextureAvailableLisener {
-                logE("SurfaceTextureAvailable")
+            playRender.setSurfaceTextureAvailableLisener {
                 mSurfaceTexture = it
                 it.setOnFrameAvailableListener {
                     cameraPreview.requestRender()
@@ -79,7 +78,10 @@ class CameraActivity : AppCompatActivity() {
 
             cameraPreview = GLSurfaceView(this@CameraActivity)
             cameraPreview.setEGLContextClientVersion(3)
-            cameraPreview.setRenderer(PlayRender(drawer))
+            playRender.addDrawer(VideoDrawer())
+            playRender.addDrawer(GrayDrawer())
+            playRender.addDrawer(VFilpDrawer())
+            cameraPreview.setRenderer(playRender)
             cameraPreview.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
             root.addView(cameraPreview)
             setContentView(root)

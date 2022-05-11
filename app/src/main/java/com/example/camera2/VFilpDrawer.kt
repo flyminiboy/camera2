@@ -8,8 +8,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.properties.Delegates
 
-// 渲染原始数据
-class VideoDrawer : IDrawer {
+// 灰度处理
+class VFilpDrawer : IDrawer {
 
     // 顶点坐标
     private val mVertexCoord = floatArrayOf(
@@ -47,8 +47,9 @@ class VideoDrawer : IDrawer {
     }
 
     private var mTextureId: Int? = null
-    private var mSurfaceTexture:SurfaceTexture?=null
+    var mSurfaceTexture: SurfaceTexture? = null
     private val transformMatrix = FloatArray(16)
+    private var mSurfaceTextureListener: ((surface: SurfaceTexture) -> Unit)? = { _ -> }
 
     var mProgram = 0
     var mVertexShader = 0
@@ -115,6 +116,16 @@ class VideoDrawer : IDrawer {
         mSurfaceTexture = surfaceTexture
     }
 
+    private fun onSurfaceTextureAvailable(surface: SurfaceTexture) {
+        mSurfaceTextureListener?.apply {
+            this.invoke(surface)
+        }
+    }
+
+    fun setSurfaceTextureAvailableLisener(listener: ((surface: SurfaceTexture) -> Unit)? = null) {
+        mSurfaceTextureListener = listener
+    }
+
     private fun getVertexShader(): String {
         return "#version 300 es\n" +
                 "\n" +
@@ -139,7 +150,7 @@ class VideoDrawer : IDrawer {
                 "uniform samplerExternalOES uTexture;\n" +
                 "out vec4 outColor;\n" +
                 "void main() {\n" +
-                "  outColor=texture(uTexture, vCoordinate);\n" +
+                "outColor = texture(uTexture, vec2(vCoordinate.x,1.0-vCoordinate.y));\n" +
                 "}\n"
     }
 
