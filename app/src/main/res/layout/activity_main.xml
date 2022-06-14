@@ -43,4 +43,13 @@
         android:layout_marginTop="7dp"
         android:text="EGL测试"/>
 
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/main_movie"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        app:layout_constraintTop_toBottomOf="@id/main_testegl"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginTop="7dp"
+        android:text="压缩视频"/>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

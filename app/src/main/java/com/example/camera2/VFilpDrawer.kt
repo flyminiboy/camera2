@@ -6,6 +6,7 @@ import android.opengl.GLES30
 import java.lang.RuntimeException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.IntBuffer
 import kotlin.properties.Delegates
 
 // 灰度处理
@@ -67,6 +68,15 @@ class VFilpDrawer : IDrawer {
 
         mOESTextureLocation = GLES30.glGetUniformLocation(mProgram, "uTexture")
         mTextureTransformLocation = GLES30.glGetUniformLocation(mProgram, "textureTransform")
+
+
+        val buffers = IntArray(1)
+        GLES30.glGenBuffers(GLES30.GL_ARRAY_BUFFER, buffers, 0)
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, buffers[0])
+        // 直接通过 target 进行操作
+        // data 是 CPU 中一块指向保存实际数据的内存,而 size 为 data 以机器单元为单位的大小,size 不能为负,否则会报 INVALID_VALUE 的错误
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, mVertexCoord.size * 4, mVertexBuffer, 0)
+
     }
 
     override fun draw() {

@@ -36,12 +36,15 @@ class MainActivity : AppCompatActivity() {
             mainTestegl.setOnClickListener {
                 test()
             }
+
+            mainMovie.setOnClickListener {
+                startActivity(Intent(this@MainActivity, MovieActivity::class.java))
+            }
         }
 
     }
 
     private fun test() {
-
 
 
 //        static void *
@@ -54,13 +57,17 @@ class MainActivity : AppCompatActivity() {
 //        }
 
 
-
         val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         logE("fuck ${null == EGL14.EGL_NO_SURFACE}")
         logE("fuck ${EGL14.EGL_NO_SURFACE}")
         logE("fuck ${EGL10.EGL_NO_SURFACE}")
         logE("fuck ${EGL10.EGL_NO_SURFACE == EGL14.EGL_NO_SURFACE}")
-        EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+        EGL14.eglMakeCurrent(
+            display,
+            EGL14.EGL_NO_SURFACE,
+            EGL14.EGL_NO_SURFACE,
+            EGL14.EGL_NO_CONTEXT
+        )
 
     }
 

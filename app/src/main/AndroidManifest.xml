@@ -18,12 +18,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Camera2">
         <activity
+            android:name=".MovieActivity"
+            android:exported="false" />
+        <activity
             android:name=".PlayActivity"
             android:exported="false" />
         <activity
             android:name=".CameraActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:exported="false" />
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".RecordActivity"
             android:exported="false" />

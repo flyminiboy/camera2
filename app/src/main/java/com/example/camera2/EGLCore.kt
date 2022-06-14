@@ -6,7 +6,7 @@ import android.opengl.EGLExt.EGL_RECORDABLE_ANDROID
 import android.view.Surface
 import java.lang.RuntimeException
 
-class EGLCore {
+class EGLCore private constructor() {
 
     companion object {
 
@@ -44,13 +44,24 @@ class EGLCore {
             EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE
         )
 
+        private val instance = EGLCore()
+
+        fun getInstance():EGLCore {
+            return instance
+        }
+
     }
 
     private var mEGLDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var mEGLContext: EGLContext = EGL14.EGL_NO_CONTEXT
-    private var mEGLSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+    var mEGLSurface: EGLSurface = EGL14.EGL_NO_SURFACE
 
-    fun init(surface: Surface?=null, width:Int = 0, height:Int = 0) {
+    fun init(
+        surface: Surface? = null,
+        context: EGLContext? = null,
+        width: Int = 0,
+        height: Int = 0
+    ) {
 
         // 创建EGLDisplay
         mEGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY).apply {
@@ -68,15 +79,15 @@ class EGLCore {
             }
 
             if (surface == null) {
-                createPBufferSurface(width, height)
+                createPBufferSurface(context, width, height)
             } else {
-                createWindowSurface(surface)
+                createWindowSurface(surface, context)
             }
         }
 
     }
 
-    private fun createWindowSurface(surface: Surface) {
+    private fun createWindowSurface(surface: Surface, context: EGLContext? = null) {
 
         checkEGLDisplay()
 
@@ -108,17 +119,20 @@ class EGLCore {
             // 创建可用窗口
             // eglCreateWindowSurface 接受单一属性，该属性用于指定所要渲染的表面是前台缓冲区还是后台缓冲区
             // EGL_RENDER_BUFFER -> EGL_SINGLE_BUFFER EGL_BACK_BUFFER（默认）
-            // window surface 是 back buffer
-            // surface 理解为 front buffer
+            // window surface 是
+            // surface
             // 双缓冲机制
             // swap
-            mEGLSurface = EGL14.eglCreateWindowSurface(mEGLDisplay, eglConfig, surface, attribList, 0)
+            mEGLSurface =
+                EGL14.eglCreateWindowSurface(mEGLDisplay, eglConfig, surface, attribList, 0)
 
+
+            val realContext = context ?: EGL14.EGL_NO_CONTEXT
 
             mEGLContext = EGL14.eglCreateContext(
                 mEGLDisplay,
                 eglConfig,
-                EGL14.EGL_NO_CONTEXT, // 表示没有共享，不和其他上下文共享资源
+                realContext, // 表示没有共享，不和其他上下文共享资源
                 ATTRIBUTE_LIST, // 指定上下文使用的属性列表，只有一个可接受的属性 - EGL_CONTEXT_FLIENT_VERSION 指定所使用的OpenGL ES 版本
                 0
             )
@@ -127,7 +141,7 @@ class EGLCore {
 
     }
 
-    fun createPBufferSurface(width: Int, height: Int) {
+    fun createPBufferSurface(context: EGLContext? = null, width: Int, height: Int) {
         checkEGLDisplay()
 
         releaseSurface()
@@ -166,10 +180,12 @@ class EGLCore {
             mEGLSurface = EGL14.eglCreatePbufferSurface(mEGLDisplay, eglConfig, attribList, 0)
 
 
+            val realContext = context ?: EGL14.EGL_NO_CONTEXT
+
             mEGLContext = EGL14.eglCreateContext(
                 mEGLDisplay,
                 eglConfig,
-                EGL14.EGL_NO_CONTEXT, // 表示没有共享，不和其他上下文共享资源
+                realContext, // 表示没有共享，不和其他上下文共享资源
                 ATTRIBUTE_LIST, // 指定上下文使用的属性列表，只有一个可接受的属性 - EGL_CONTEXT_FLIENT_VERSION 指定所使用的OpenGL ES 版本
                 0
             )
@@ -206,7 +222,12 @@ class EGLCore {
         checkEGLDisplay()
         checkEGLSurface()
 
-        EGL14.eglMakeCurrent(mEGLDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+        EGL14.eglMakeCurrent(
+            mEGLDisplay,
+            EGL14.EGL_NO_SURFACE,
+            EGL14.EGL_NO_SURFACE,
+            EGL14.EGL_NO_CONTEXT
+        )
         EGL14.eglDestroySurface(mEGLDisplay, mEGLSurface)
         EGL14.eglDestroyContext(mEGLDisplay, mEGLContext)
         EGL14.eglReleaseThread()
@@ -219,7 +240,12 @@ class EGLCore {
 
     private fun releaseSurface() {
         if (mEGLDisplay != EGL14.EGL_NO_DISPLAY && mEGLSurface != EGL14.EGL_NO_SURFACE) {
-            EGL14.eglMakeCurrent(mEGLDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+            EGL14.eglMakeCurrent(
+                mEGLDisplay,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_CONTEXT
+            )
             EGL14.eglDestroySurface(mEGLDisplay, mEGLSurface)
             mEGLSurface = EGL14.EGL_NO_SURFACE
         }

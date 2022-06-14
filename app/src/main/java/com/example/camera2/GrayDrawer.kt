@@ -149,7 +149,7 @@ class GrayDrawer : IDrawer {
                 "in vec2 vCoordinate;\n" +
                 "uniform samplerExternalOES uTexture;\n" +
                 "out vec4 outColor;\n" +
-                "const highp vec3 W = vec3(0.2125, 0.7154, 0.0721);\n" +  // 颜色权重
+                "const mediump vec3 W = vec3(0.2125, 0.7154, 0.0721);\n" +  // 颜色权重
                 "void main() {\n" +
                 "vec4 sourceColor = texture(uTexture, vCoordinate);\n" +
                 "float luminance = dot(sourceColor.rgb, W);" +  // 点乘，得到一个标量

@@ -570,7 +570,7 @@ class RecordActivity : AppCompatActivity() {
 
 
         codec?.apply {
-            signalEndOfInputStream() // 告知编码器我们要结束编码
+            signalEndOfInputStream() // 告知编码器我们要结束编码 这只能与从由 createInputSurface 创建的 Surface 接收输入的编码器一起使用。
             // mediacodec状态进入到 Uninitialized 需要再次进行config，才可以再次start
             stop()
             mCodecStatus = 0
@@ -598,8 +598,8 @@ class RecordActivity : AppCompatActivity() {
 
     inner class EncodecCallback : MediaCodec.Callback() {
         override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
-            // TODO surface
-            // TODO buffer
+            // TODO buffer 模式 接受到 YUV 数据
+            // surface 模式不需要处理这部分代码
         }
 
         override fun onOutputBufferAvailable(
@@ -607,6 +607,8 @@ class RecordActivity : AppCompatActivity() {
             index: Int,
             info: MediaCodec.BufferInfo
         ) {
+
+            // 将编码好的H264数据进行封装
 
             logE("onOutputBufferAvailable")
             // Timed out while waiting for request to complete.
